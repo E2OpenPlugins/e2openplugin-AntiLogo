@@ -1,78 +1,110 @@
 from Screens.Screen import Screen
-from Screens.InfoBar import InfoBar
-from Screens.InputBox import InputBox
-from Screens.ChoiceBox import ChoiceBox
 from Components.ActionMap import ActionMap
-from Components.Label import Label
 from Components.MenuList import MenuList
-from Components.Input import Input
+from Components.config import config
 from Plugins.Plugin import PluginDescriptor
 
-from enigma import ePoint, eSize
+from enigma import ePoint, eSize, getDesktop, iPlayableService
+from Components.ServiceEventTracker import ServiceEventTracker
 
-from ConfigParser import ConfigParser, DEFAULTSECT, DuplicateSectionError
+import xml.etree.cElementTree as xml
 
-class AntiLogoMain(InfoBar):
-	def __init__(self, session, args = 0, size = None, position = None):
-		config = AntiLogoConfig()
+# Global variables
+SERVICES_FILENAME = "/etc/enigma2/antilogo.xml"
+DEFAULT_SERVICES = '<?xml version="1.0" encoding="iso-8859-1"?>\n<services/>\n'
+servicesobject = None
+services = None
+display = None
+
+# The global dirty flag is used to detect a change in service while
+# our menu is open. The user can't do that, but the system can. E.g.
+# A recording might start while the menu is open. The service to be
+# recorded has a conflict with the current service but an alternative
+# is available without conflict. In that case enigma will change the
+# service without user intervention. But since our menu is open we will
+# have invalid data to work with and we might easliy crash the system.
+dirty = False
+
+#Global functions
+def load(filename, defaultfile):
+	doublefault = False
+	xmlobject = None
+	root = None
+	while root is None:
 		try:
-			preset = config.getLastPreset()
-			self.size = [preset["width"], preset["height"]]
-			self.position = [preset["x"], preset["y"]]
+			xmlobject = xml.parse(filename)
+			root = xmlobject.getroot()
 		except Exception:
-			config.setPreset("standard",[100, 100],[20, 20])
-			config = AntiLogoConfig()
-			preset = config.getPreset("standard")
+			if doublefault:
+				break
+			of = open(filename, "w")
+			of.write(defaultfile)
+			of.close()
+			doublefault = True
+	return (xmlobject, root)
 
-		self.size = [preset["width"],preset["height"]]
-		self.position = [preset["x"],preset["y"]]
-		skin = "<screen position=\"%i,%i\" size=\"%i,%i\" title=\"%s\"  flags=\"wfNoBorder\" >" %(preset["x"],preset["y"],preset["width"],preset["height"], "AntiLogo")
-		skin += "<widget name=\"label\" position=\"0,0\" size=\"%i,%i\"  backgroundColor=\"transpBlack\"  />" %(preset["width"],preset["height"])
-		skin += "</screen>"
-		self.skin = skin
-		InfoBar.__init__(self, session)
-		self.hideTimer.callback.pop()
+def save(root, xmlobject, filename):
+	for element in list(root):
+		if len(list(element)) == 0:
+			root.remove(element)
+	xmlobject.write(filename, encoding = "iso-8859-1")
 
-		self["label"] = Label()
-		self["actions"] = ActionMap(["MenuActions"],
-				{
-				"menu": self.openmenu,
-				}, prio=-4)
+def getService(services, ref):
+	for service in services:
+		if service.get('ref') == ref:
+			return service
+	return None
 
-	def openmenu(self):
-		self.session.open(AntiLogoMenu, callback = self.menuCallback, size = self.size, position = self.position)
+def createService(services, ref, name):
+	newService = xml.Element("service", {'name': name, 'ref': ref})
+	services.append(newService)
+	return newService
 
-	def menuCallback(self, size, position):
-		if size and position:
-			self.size = size
-			self.position = position
-			self.move(self.position[0], self.position[1])
-			self.resize(self.size[0], self.size[1])
+def newPreset(x, y, width, height, color):
+	return xml.Element("preset", {'x': '%i' % x, 'y': '%i' % y, 'width': '%i' % width, 'height': '%i' % height, 'color': '%i' % color})
+
+def getPosition(preset):
+	return [int(preset.get("x")), int(preset.get("y"))]
+
+def getSize(preset):
+	return [int(preset.get("width")), int(preset.get("height"))]
+
+def getColor(preset):
+	return int(preset.get("color"))
+
+def onstandby(configElement):
+	global services, servicesobject, SERVICES_FILENAME
+	save(services, servicesobject, SERVICES_FILENAME)
+
+# Initialisation
+(servicesobject, services) = load(SERVICES_FILENAME, DEFAULT_SERVICES)
+config.misc.standbyCounter.addNotifier(onstandby, initial_call = False)
+
+# Classes
+class AntiLogoScreen(Screen):
+	def __init__(self, session, size, position, color, border = False):
+		self.session = session
+		self.size = size
+		self.position = position
+		self.color = color
+		self.border = border
+		if self.border:
+			borderStr = ""
 		else:
-			self.close()
-
-	def move(self, x, y):
-		self.instance.move(ePoint(x, y))
-
-	def resize(self, w, h):
-		self.instance.resize(eSize(*(w, h)))
-		self["label"].instance.resize(eSize(*(w, h)))
-
-class AntiLogoBase(Screen):
-	def __init__(self, session, size, position):
-		preset = {}
-		preset["width"] = size[0]
-		preset["height"] = size[1]
-		preset["x"] = position[0]
-		preset["y"] = position[1]
-		self.size = [preset["width"], preset["height"]]
-		self.position = [preset["x"], preset["y"]]
-		skin = "<screen position=\"%i,%i\" size=\"%i,%i\" title=\"%s\"  flags=\"wfNoBorder\" >" %(preset["x"], preset["y"],preset["width"], preset["height"], "AntiLogo")
-		skin += "<widget name=\"label\" position=\"0,0\" size=\"%i,%i\"  backgroundColor=\"transpBlack\"  />" %(preset["width"],preset["height"])
-		skin += "</screen>"
-		self.skin = skin
+			borderStr = "flags=\"wfNoBorder\""
+		colorStr = "backgroundColor=\"#%s000000\"" % '{0:02X}'.format(self.color << 4)
+		self.skin = "<screen title=\"logo\" position=\"%i,%i\" size=\"%i,%i\" %s %s/>" %(position[0], position[1], size[0], size[1], colorStr, borderStr)
 		Screen.__init__(self, session)
-		self["label"] = Label()
+
+	def move(self):
+		self.instance.move(ePoint(self.position[0], self.position[1]))
+
+	def resize(self):
+		self.instance.resize(eSize(*(self.size[0], self.size[1])))
+
+class AntiLogoBase(AntiLogoScreen):
+	def __init__(self, session, screen):
+		AntiLogoScreen.__init__(self, session, screen.size, screen.position, screen.color, screen.border)
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions", "MenuActions"],
 		{
 			"ok": self.go,
@@ -84,208 +116,356 @@ class AntiLogoBase(Screen):
 			"right": self.right,
 			}, -1)
 
-	def move(self, x, y):
-		self.instance.move(ePoint(x, y))
-
-	def resize(self, w, h):
-		self.instance.resize(eSize(*(w, h)))
-		self["label"].instance.resize(eSize(*(w, h)))
-
 class AntiLogoMove(AntiLogoBase):
-	step = 5
-	def __init__(self, session, args = 0, size = [], position = []):
-		AntiLogoBase.__init__(self, session, size, position)
+	def __init__(self, session, screen0, screen1, step):
+		self.screen0 = screen0
+		self.screen1 = screen1
+		self.step = step
+		screen1.hide()
+		AntiLogoBase.__init__(self, session, screen0)
 
 	def go(self):
-		self.close(self.position)
+		self.screen0.move()
+		self.screen1.move()
+		self.screen1.show()
+		self.close()
 	
 	def up(self):
-		self.position = [self.position[0],self.position[1]-self.step]
-		self.move(self.position[0],self.position[1])
+		self.position[1] -= self.step
+		self.move()
 
 	def down(self):
-		self.position = [self.position[0],self.position[1]+self.step]
-		self.move(self.position[0],self.position[1])
+		self.position[1] += self.step
+		self.move()
 
 	def left(self):
-		self.position = [self.position[0]-self.step,self.position[1]]
-		self.move(self.position[0],self.position[1])
+		self.position[0] -= self.step
+		self.move()
 
 	def right(self):
-		self.position = [self.position[0]+self.step,self.position[1]]
-		self.move(self.position[0],self.position[1])
+		self.position[0] += self.step
+		self.move()
 
 class AntiLogoResize(AntiLogoBase):
-	step = 5
-	def __init__(self, session, args = 0, size = [], position = []):
-		AntiLogoBase.__init__(self, session, size, position)
+	def __init__(self, session, screen0, screen1, step):
+		self.screen0 = screen0
+		self.screen1 = screen1
+		self.step = step
+		screen1.hide()
+		AntiLogoBase.__init__(self, session, screen0)
 
 	def go(self):
-		self.close(self.size)
+		self.screen0.resize()
+		self.screen1.resize()
+		self.screen1.show()
+		self.close()
 
 	def up(self):
-		self.size = [self.size[0],self.size[1]-self.step]
-		self.resize(self.size[0],self.size[1])
+		self.size[1] -= self.step
+		self.resize()
 
 	def down(self):
-		self.size = [self.size[0],self.size[1]+self.step]
-		self.resize(self.size[0],self.size[1])
+		self.size[1] += self.step
+		self.resize()
 
 	def left(self):
-		self.size= [self.size[0]-self.step,self.size[1]]
-		self.resize(self.size[0],self.size[1])
+		self.size[0] -= self.step
+		self.resize()
 
 	def right(self):
-		self.size = [self.size[0]+self.step,self.size[1]]
-		self.resize(self.size[0],self.size[1])
+		self.size[0] += self.step
+		self.resize()
+
+class AntiLogoColor(AntiLogoBase):
+	def __init__(self, session, list0, list1, index):
+		self.session = session
+		self.list0 = list0
+		self.list1 = list1
+		self.index = index
+		list1[index].hide()
+		AntiLogoBase.__init__(self, session, list0[index])
+
+	def go(self):
+		self.session.deleteDialog(self.list0[self.index])
+		self.session.deleteDialog(self.list1[self.index])
+		self.list0[self.index] = self.session.instantiateDialog(AntiLogoScreen, size = self.size, position = self.position, color = self.color)
+		self.list1[self.index] = self.session.instantiateDialog(AntiLogoScreen, size = self.size, position = self.position, color = self.color, border = True)
+		self.list1[self.index].show()
+		self.close(-1)
+
+	def up(self):
+		if self.color < 15:
+			self.color += 1
+			self.close(self.color)
+
+	def down(self):
+		if self.color > 0:
+			self.color -= 1
+			self.close(self.color)
+
+	def left(self):
+		pass
+		
+	def right(self):
+		pass
+
+class AntiLogoDisplay(Screen):
+	def __init__(self, session):
+		desktop_size = getDesktop(0).size()
+		AntiLogoDisplay.skin = "<screen name=\"AntiLogoDisplay\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
+		Screen.__init__(self, session)
+		self.session = session
+		self.dlgs = []
+
+		self.__event_tracker = ServiceEventTracker(screen = self, eventmap =
+			{
+				iPlayableService.evStart: self.__evServiceStart,
+				iPlayableService.evEnd: self.__evServiceEnd
+			})
+
+	def destroy(self):
+		self.serviceEnd()
+
+	def __evServiceStart(self):
+		self.serviceStart()
+
+	def serviceStart(self):
+		global services, dirty
+		dirty = True
+		name = self.session.nav.getCurrentService().info().getName()
+		ref = self.session.nav.getCurrentlyPlayingServiceReference().toString()
+		self.dlgs = []
+		self.service = getService(services, ref)
+		if self.service is not None:
+			for preset in list(self.service):
+				position = getPosition(preset)
+				size = getSize(preset)
+				color = getColor(preset)
+				dlg = self.session.instantiateDialog(AntiLogoScreen, size = size, position = position, color = color)
+				dlg.show()
+				self.dlgs.append(dlg)
+		else:
+			self.service = createService(services, ref, name)
+
+	def __evServiceEnd(self):
+		self.serviceEnd()
+
+	def serviceEnd(self):
+		global dirty
+		dirty = True
+		for dlg in self.dlgs:
+			self.session.deleteDialog(dlg)
+		self.dlgs = []
+		self.service = None
+
+	def show(self):
+		for dlg in self.dlgs:
+			dlg.show()
+
+	def hide(self):
+		for dlg in self.dlgs:
+			dlg.hide()
+
+class AntiLogoMain(Screen):
+	def __init__(self, session):
+		global servicesobject, services, servicesfilename, defaultservicesobject, display, dirty
+		desktop_size = getDesktop(0).size()
+		AntiLogoMain.skin = "<screen name=\"AntiLogoMain\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
+		Screen.__init__(self, session)
+		self.session = session
+		if display is None:
+			display = session.instantiateDialog(AntiLogoDisplay)
+			display.serviceStart()
+#		This is the optimistic approach since an inadvertent change of service is very unlikely.
+#		We might loose the work on the current service, though.
+		dirty = False
+		self.dlgs = []
+		for dlg in display.dlgs:
+			dlgWithBorder = session.instantiateDialog(AntiLogoScreen, size = dlg.size, position = dlg.position, color = dlg.color, border = True)
+			self.dlgs.append(dlgWithBorder)
+
+	def close(self):
+		for dlg in self.dlgs:
+			self.session.deleteDialog(dlg)
+		self.dlgs = []
+		super(AntiLogoMain, self).close()
+
+	def openMenu(self):
+		global display
+		self.session.openWithCallback(self.menuCallback, AntiLogoMenu, display, self.dlgs)
+
+	def menuCallback(self, code):
+		global display, servicesobject, services, servicesfilename
+		if code == 1:
+			display.destroy()
+			self.session.deleteDialog(display)
+			del display
+			display = None
+		self.close()
 
 class AntiLogoMenu(Screen):
-	def __init__(self,session,callback=None,size=None,position=None,arg=0):
+	def __init__(self, session, display, list):
 		self.session = session
-		self.callBack = callback
-		self.size= size
-		self.position = position
-		ss  ="<screen position=\"200,200\" size=\"300,200\" title=\"AntiLogo menu\" >"
-		ss +="<widget name=\"menu\" position=\"0,0\" size=\"300,150\" scrollbarMode=\"showOnDemand\" />"
+		self.list = list
+		self.display = display
+		self.index = len(list) - 1
+		self.steplist = (1, 2, 5, 10, 20, 50, 100, 200)
+		self.stepindex = 2
+		self.activate()
+		ss  ="<screen position=\"275,165\" size=\"150,230\" title=\"AntiLogo menu\" >"
+		ss +="<widget name=\"menu\" position=\"0,0\" size=\"150,230\" scrollbarMode=\"showOnDemand\" />"
 		ss +="</screen>"
 		self.skin = ss
-		Screen.__init__(self,session)
-		list = []
-		list.append((_("exit"), self.exit))
-		list.append((_("move"), self.move))
-		list.append((_("resize"), self.resize))
-		list.append((_("load"), self.load))
-		list.append((_("save"), self.save))
-		list.append((_("save as"), self.saveas))
-		self["menu"] = MenuList(list)
+
+		self["menu"] = MenuList(
+						[
+						(_("add"), self.add), 
+						(_("move"), self.move), 
+						(_("resize"), self.resize), 
+						(_("alpha"), self.color), 
+						(_("step +"), self.stepUp), 
+						(_("step -"), self.stepDown), 
+						(_("remove"), self.remove), 
+						(_("next"), self.next), 
+						(_("stop"), self.stop)
+						])
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions"],
 						{
 						"ok": self.go,
-						"back": self.close,
+						"back": self.exit,
 						}, -1)
+		Screen.__init__(self, session)
+
+	def close(self, code):
+		self.deActivate()
+		super(AntiLogoMenu, self).close(code)
 
 	def exit(self):
-		self.callBack(None, None)
-		self.close()
+		self.save()
+		self.close(0)
+
+	def stop(self):
+		self.save()
+		self.close(1)
 
 	def go(self):
 		selection = self["menu"].getCurrent()
 		selection[1]()
 
-	def load(self):
-		config = AntiLogoConfig()
-		list = []
-		for i in config.getPresets():
-			list.append((i,i))
-		self.session.openWithCallback(self.loadPreset,ChoiceBox,_("select preset to load"),list)
+	def activate(self):
+		global dirty
+		if dirty:
+			self.exit()
+		elif self.index >= 0:
+			self.display.dlgs[self.index].hide()
+			self.list[self.index].show()
+	
+	def deActivate(self):
+		global dirty
+		if dirty:
+			self.exit()
+		elif self.index >= 0:
+			self.display.dlgs[self.index].show()
+			self.list[self.index].hide()
+	
+	def add(self):
+		global dirty
+		if dirty:
+			self.exit()
+		else:
+			self.deActivate()
+			dlgNoBorder = self.session.instantiateDialog(AntiLogoScreen, size = [60, 60], position = [30, 30], color = 4)
+			dlgWithBorder = self.session.instantiateDialog(AntiLogoScreen, size = dlgNoBorder.size, position = dlgNoBorder.position, color = dlgNoBorder.color, border = True)
+			self.display.dlgs.append(dlgNoBorder)
+			self.list.append(dlgWithBorder)
+			self.index = len(self.list) - 1
+			self.activate()
 
-	def loadPreset(self,value):
-		if value is not None:
-			config = AntiLogoConfig()
-			preset = config.getPreset(value[1])
-			if preset is not False:
-				self.callBack([preset["width"],preset["height"]],[preset["x"],preset["y"]])
+	def remove(self):
+		global dirty
+		if dirty:
+			self.exit()
+		elif self.index >= 0:
+			self.session.deleteDialog(self.display.dlgs[self.index])
+			self.session.deleteDialog(self.list[self.index])
+			del self.display.dlgs[self.index]
+			del self.list[self.index]
+			if self.index > len(self.list) - 1:
+				self.index -= 1
+				self.activate()
 
-	def presetnameEntered(self,value):
-		if value is not None:
-			config = AntiLogoConfig()
-			config.setPreset(value,self.size,self.position)
+	def next(self):
+		global dirty
+		if dirty:
+			self.exit()
+		elif len(self.list) > 0:
+			self.deActivate()
+			self.index += 1
+			self.index %= len(self.list)
+			self.activate()
 
 	def save(self):
-		config = AntiLogoConfig()
-		list = []
-		for i in config.getPresets():
-			list.append((i, i))
-		self.session.openWithCallback(self.savePreset, ChoiceBox,_("select preset to save"), list)
+		global dirty
+		if not dirty:
+			for preset in list(self.display.service):
+				self.display.service.remove(preset)
+			for dlg in self.list:
+				preset = newPreset(x = dlg.position[0], y = dlg.position[1], width = dlg.size[0], height = dlg.size[1], color = dlg.color)
+				self.display.service.append(preset)
 
-	def saveas(self):
-		name = ""
-		if self.session.nav.getCurrentService():
-			name = self.session.nav.getCurrentService().info().getName()
-		self.session.openWithCallback(self.presetnameEntered, InputBox, title = _("please enter a name"), text=name, maxSize=False, type=Input.TEXT)
+	def stepUp(self):
+		if self.stepindex < len(self.steplist) - 1:
+			self.stepindex += 1
 
-	def savePreset(self, value):
-		if value is not None:
-			config = AntiLogoConfig()
-			config.setPreset(value[1], self.size, self.position)
+	def stepDown(self):
+		if self.stepindex > 0:
+			self.stepindex -= 1
 
 	def move(self):
-		self.session.openWithCallback(self.moveCompleted, AntiLogoMove, size = self.size, position = self.position)
-
-	def moveCompleted(self, position):
-		self.position = position
-		self.callBack(self.size, self.position)
+		global dirty
+		if dirty:
+			self.exit()
+		elif self.index >= 0:
+			self.session.open(AntiLogoMove, self.display.dlgs[self.index], self.list[self.index], self.steplist[self.stepindex])
 
 	def resize(self):
-		self.session.openWithCallback(self.resizeCompleted, AntiLogoResize, size = self.size, position = self.position)
+		global dirty
+		if dirty:
+			self.exit()
+		elif self.index >= 0:
+			self.session.open(AntiLogoResize, self.display.dlgs[self.index], self.list[self.index], self.steplist[self.stepindex])
 
-	def resizeCompleted(self, size):
-		self.size = size
-		self.callBack(self.size, self.position)
+	def color(self):
+		global dirty
+		if dirty:
+			self.exit()
+		elif self.index >= 0:
+			self.session.openWithCallback(self.colorChanged, AntiLogoColor, self.display.dlgs, self.list, self.index)
 
-class AntiLogoConfig:
-	configfile = "/etc/enigma2/AntiLogo.conf"
-
-	def __init__(self):
-		self.configparser = ConfigParser()
-		self.configparser.read(self.configfile)
-
-	def setLastPreset(self,name):
-		self.configparser.set(DEFAULTSECT, "lastpreset",name)
-		self.writeConfig()
-
-	def getLastPreset(self):
-		last = self.configparser.get(DEFAULTSECT, "lastpreset")
-		return self.getPreset(last)
-
-	def getPresets(self):
-		presets = []
-		sections = self.configparser.sections()
-		for section in sections:
-			presets.append(section)
-		return presets
-
-	def getPreset(self,name):
-		if self.configparser.has_section(name) is True:
-			print "loading preset ",name
-			l = {}
-			l["x"] = int(self.configparser.get(name, "x"))
-			l["y"] = int(self.configparser.get(name, "y"))
-			l["width"] = int(self.configparser.get(name, "width"))
-			l["height"] = int(self.configparser.get(name, "height"))
-			self.setLastPreset(name)
-			return l
-		else:
-			print "couldn't find preset", name
-			return False
-
-	def setPreset(self,name,size,position):
-		try:
-			self.configparser.add_section(name)
-			self.configparser.set(name, "x", position[0])
-			self.configparser.set(name, "y", position[1])
-			self.configparser.set(name, "width", size[0])
-			self.configparser.set(name, "height", size[1])
-			self.configparser.set(DEFAULTSECT, "lastpreset",name)
-			self.writeConfig()
-			return True
-		except DuplicateSectionError:
-			self.deletePreset(name)
-			self.setPreset(name, size, position)
-
-	def deletePreset(self,name):
-		self.configparser.remove_section(name)
-		self.writeConfig()
-
-	def writeConfig(self):
-		fp = open(self.configfile, "w")
-		self.configparser.write(fp)
-		fp.close()
-
+	def colorChanged(self, newColor):
+		global dirty
+		if dirty:
+			self.exit()
+		elif newColor >= 0:
+			self.display.dlgs[self.index].color = newColor
+			self.list[self.index].color = newColor
+			self.color()
 
 def main(session, **kwargs):
-	session.open(AntiLogoMain)
+	if session.nav.getCurrentService():
+		dlg = session.open(AntiLogoMain)
+		dlg.openMenu()
+
+def autostart(reason, session = None, **kwargs):
+	if reason == 1:
+		onstandby(None)
+
+def sessionstart(reason, session = None, **kwargs):
+	global display
+	if reason == 0:
+		display = session.instantiateDialog(AntiLogoDisplay)
 
 def Plugins(**kwargs):
-	return [PluginDescriptor(name = "AntiLogo" ,description = _("mask irritating logos"), where = PluginDescriptor.WHERE_PLUGINMENU, fnc = main),
-					PluginDescriptor(name = "AntiLogo", description = _("mask irritating logos"), where = PluginDescriptor.WHERE_EXTENSIONSMENU, fnc = main)]
+	return [PluginDescriptor(name = "AntiLogo", where = PluginDescriptor.WHERE_EXTENSIONSMENU, fnc = main),
+			PluginDescriptor(where = PluginDescriptor.WHERE_AUTOSTART, fnc = autostart ),
+			PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = sessionstart)]
