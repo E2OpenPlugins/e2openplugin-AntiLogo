@@ -1,18 +1,19 @@
 from Screens.Screen import Screen
+from Screens.InfoBar import InfoBar
 from Components.ActionMap import ActionMap
 from Components.MenuList import MenuList
-from Components.config import config
+from Components.ServiceEventTracker import ServiceEventTracker, InfoBarBase
+from Screens.InfoBar import InfoBar
 from Plugins.Plugin import PluginDescriptor
 
 from enigma import ePoint, eSize, getDesktop, iPlayableService
-from Components.ServiceEventTracker import ServiceEventTracker
 
 import xml.etree.cElementTree as xml
 
 # Global variables
-SERVICES_FILENAME = "/etc/enigma2/antilogo.xml"
-DEFAULT_SERVICES = '<?xml version="1.0" encoding="iso-8859-1"?>\n<services/>\n'
-servicesobject = None
+configfilename = "/etc/enigma2/antilogo.xml"
+defaultconfig = '<?xml version="1.0" encoding="iso-8859-1"?>\n<services enabled="True"/>\n'
+config = None
 services = None
 display = None
 
@@ -37,17 +38,20 @@ def load(filename, defaultfile):
 		except Exception:
 			if doublefault:
 				break
-			of = open(filename, "w")
-			of.write(defaultfile)
-			of.close()
+			configFile = open(filename, "w")
+			configFile.write(defaultfile)
+			configFile.close()
 			doublefault = True
 	return (xmlobject, root)
 
-def save(root, xmlobject, filename):
-	for element in list(root):
-		if len(list(element)) == 0:
-			root.remove(element)
+def write(xmlobject, filename):
 	xmlobject.write(filename, encoding = "iso-8859-1")
+
+def getEnabled(services):
+	return services.get('enabled') == "True"
+
+def setEnabled(services, value):
+	services.set('enabled', str(value))
 
 def getService(services, ref):
 	for service in services:
@@ -72,13 +76,8 @@ def getSize(preset):
 def getColor(preset):
 	return int(preset.get("color"))
 
-def onstandby(configElement):
-	global services, servicesobject, SERVICES_FILENAME
-	save(services, servicesobject, SERVICES_FILENAME)
-
 # Initialisation
-(servicesobject, services) = load(SERVICES_FILENAME, DEFAULT_SERVICES)
-config.misc.standbyCounter.addNotifier(onstandby, initial_call = False)
+(config, services) = load(configfilename, defaultconfig)
 
 # Classes
 class AntiLogoScreen(Screen):
@@ -210,12 +209,14 @@ class AntiLogoColor(AntiLogoBase):
 		pass
 
 class AntiLogoDisplay(Screen):
+	
 	def __init__(self, session):
 		desktop_size = getDesktop(0).size()
 		AntiLogoDisplay.skin = "<screen name=\"AntiLogoDisplay\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
 		Screen.__init__(self, session)
 		self.session = session
-		self.dlgs = []
+		self.dlgs = [ ]
+		self.infobars = [ ]
 
 		self.__event_tracker = ServiceEventTracker(screen = self, eventmap =
 			{
@@ -223,8 +224,34 @@ class AntiLogoDisplay(Screen):
 				iPlayableService.evEnd: self.__evServiceEnd
 			})
 
+		# this would be the current infobar singleton
+		# it would be None most likely on sessionstart
+		# but we should not depend on that.
+		self.infobarOpened(InfoBar.instance)
+		InfoBarBase.connectInfoBarOpened(self.infobarOpened)
+		InfoBarBase.connectInfoBarClosed(self.infobarClosed)
+
 	def destroy(self):
+		InfoBarBase.disconnectInfoBarOpened(self.infobarOpened)
+		InfoBarBase.disconnectInfoBarClosed(self.infobarClosed)
+		for infobar in self.infobars:
+			self.infobarClosed(infobar)
 		self.serviceEnd()
+		
+	def infobarOpened(self, infobar):
+		if infobar:
+			if not infobar in self.infobars:
+				self.infobars.append(infobar)
+			if not self.hide in infobar.onShow:
+				# great, we can do this. Actually it should be a protected access
+				infobar.onShow.append(self.hide)
+				infobar.onHide.append(self.show)
+
+	def infobarClosed(self, infobar):
+		if infobar:
+			if self.hide in infobar.onShow:
+				infobar.onShow.remove(self.hide)
+				infobar.onHide.remove(self.show)
 
 	def __evServiceStart(self):
 		self.serviceStart()
@@ -268,7 +295,7 @@ class AntiLogoDisplay(Screen):
 
 class AntiLogoMain(Screen):
 	def __init__(self, session):
-		global servicesobject, services, servicesfilename, defaultservicesobject, display, dirty
+		global config, services, configfilename, defaultconfig, display, dirty
 		desktop_size = getDesktop(0).size()
 		AntiLogoMain.skin = "<screen name=\"AntiLogoMain\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
 		Screen.__init__(self, session)
@@ -295,12 +322,15 @@ class AntiLogoMain(Screen):
 		self.session.openWithCallback(self.menuCallback, AntiLogoMenu, display, self.dlgs)
 
 	def menuCallback(self, code):
-		global display, servicesobject, services, servicesfilename
+		global display, config, services, configfilename
+		enabled = True
 		if code == 1:
 			display.destroy()
 			self.session.deleteDialog(display)
 			del display
 			display = None
+			enabled= False
+		setEnabled(services, enabled)
 		self.close()
 
 class AntiLogoMenu(Screen):
@@ -312,8 +342,8 @@ class AntiLogoMenu(Screen):
 		self.steplist = (1, 2, 5, 10, 20, 50, 100, 200)
 		self.stepindex = 2
 		self.activate()
-		ss  ="<screen position=\"275,165\" size=\"150,230\" title=\"AntiLogo menu\" >"
-		ss +="<widget name=\"menu\" position=\"0,0\" size=\"150,230\" scrollbarMode=\"showOnDemand\" />"
+		ss  ="<screen position=\"center,center\" size=\"80,230\" title=\"AntiLogo\" >"
+		ss +="<widget name=\"menu\" position=\"0,0\" size=\"80,230\" scrollbarMode=\"showOnDemand\" />"
 		ss +="</screen>"
 		self.skin = ss
 
@@ -450,19 +480,23 @@ class AntiLogoMenu(Screen):
 			self.display.dlgs[self.index].color = newColor
 			self.list[self.index].color = newColor
 			self.color()
-
+		
 def main(session, **kwargs):
 	if session.nav.getCurrentService():
 		dlg = session.open(AntiLogoMain)
 		dlg.openMenu()
 
 def autostart(reason, session = None, **kwargs):
+	global services, config, configfilename
 	if reason == 1:
-		onstandby(None)
+		for service in list(services):
+			if len(list(service)) == 0:
+				services.remove(service)
+		write(config, configfilename)
 
 def sessionstart(reason, session = None, **kwargs):
 	global display
-	if reason == 0:
+	if reason == 0 and getEnabled(services):
 		display = session.instantiateDialog(AntiLogoDisplay)
 
 def Plugins(**kwargs):
