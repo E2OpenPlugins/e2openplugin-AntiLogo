@@ -8,6 +8,7 @@ from Plugins.Plugin import PluginDescriptor
 
 from enigma import ePoint, eSize, getDesktop, iPlayableService
 
+import os
 import xml.etree.cElementTree as xml
 
 # Global variables
@@ -128,7 +129,7 @@ class AntiLogoMove(AntiLogoBase):
 		self.screen1.move()
 		self.screen1.show()
 		self.close()
-	
+
 	def up(self):
 		self.position[1] -= self.step
 		self.move()
@@ -204,12 +205,12 @@ class AntiLogoColor(AntiLogoBase):
 
 	def left(self):
 		pass
-		
+
 	def right(self):
 		pass
 
 class AntiLogoDisplay(Screen):
-	
+
 	def __init__(self, session):
 		desktop_size = getDesktop(0).size()
 		AntiLogoDisplay.skin = "<screen name=\"AntiLogoDisplay\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
@@ -237,7 +238,7 @@ class AntiLogoDisplay(Screen):
 		for infobar in self.infobars:
 			self.infobarClosed(infobar)
 		self.serviceEnd()
-		
+
 	def infobarOpened(self, infobar):
 		if infobar:
 			if not infobar in self.infobars:
@@ -261,6 +262,11 @@ class AntiLogoDisplay(Screen):
 		dirty = True
 		name = self.session.nav.getCurrentService().info().getName()
 		ref = self.session.nav.getCurrentlyPlayingServiceReference().toString()
+                # try to get name and ref from recording
+		recmeta = self.session.nav.getCurrentlyPlayingServiceReference().getPath() + '.meta'
+		if os.path.isfile(recmeta):
+			with open(recmeta) as f:
+				ref, name = f.readline().rsplit(':', 1)
 		self.dlgs = []
 		self.service = getService(services, ref)
 		if self.service is not None:
@@ -349,14 +355,14 @@ class AntiLogoMenu(Screen):
 
 		self["menu"] = MenuList(
 						[
-						(_("add"), self.add), 
-						(_("move"), self.move), 
-						(_("resize"), self.resize), 
-						(_("alpha"), self.color), 
-						(_("step +"), self.stepUp), 
-						(_("step -"), self.stepDown), 
-						(_("remove"), self.remove), 
-						(_("next"), self.next), 
+						(_("add"), self.add),
+						(_("move"), self.move),
+						(_("resize"), self.resize),
+						(_("alpha"), self.color),
+						(_("step +"), self.stepUp),
+						(_("step -"), self.stepDown),
+						(_("remove"), self.remove),
+						(_("next"), self.next),
 						(_("stop"), self.stop)
 						])
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions"],
@@ -389,7 +395,7 @@ class AntiLogoMenu(Screen):
 		elif self.index >= 0:
 			self.display.dlgs[self.index].hide()
 			self.list[self.index].show()
-	
+
 	def deActivate(self):
 		global dirty
 		if dirty:
@@ -397,7 +403,7 @@ class AntiLogoMenu(Screen):
 		elif self.index >= 0:
 			self.display.dlgs[self.index].show()
 			self.list[self.index].hide()
-	
+
 	def add(self):
 		global dirty
 		if dirty:
@@ -480,7 +486,7 @@ class AntiLogoMenu(Screen):
 			self.display.dlgs[self.index].color = newColor
 			self.list[self.index].color = newColor
 			self.color()
-		
+
 def main(session, **kwargs):
 	if session.nav.getCurrentService():
 		dlg = session.open(AntiLogoMain)
