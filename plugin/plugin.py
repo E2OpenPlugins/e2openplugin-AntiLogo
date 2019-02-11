@@ -1,3 +1,4 @@
+from . import _
 from Screens.Screen import Screen
 from Screens.InfoBar import InfoBar
 from Components.ActionMap import ActionMap
@@ -26,6 +27,10 @@ display = None
 # service without user intervention. But since our menu is open we will
 # have invalid data to work with and we might easliy crash the system.
 dirty = False
+
+FHD = False
+if getDesktop(0).size().width() >= 1920:
+	FHD = True
 
 #Global functions
 def load(filename, defaultfile):
@@ -62,7 +67,8 @@ def getService(services, ref):
 
 def createService(services, ref, name):
 	newService = xml.Element("service", {'name': name, 'ref': ref})
-	services.append(newService)
+	if newService not in services:
+		services.append(newService)
 	return newService
 
 def newPreset(x, y, width, height, color):
@@ -216,6 +222,7 @@ class AntiLogoDisplay(Screen):
 		AntiLogoDisplay.skin = "<screen name=\"AntiLogoDisplay\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
 		Screen.__init__(self, session)
 		self.session = session
+		self.service = None
 		self.dlgs = [ ]
 		self.infobars = [ ]
 
@@ -260,9 +267,11 @@ class AntiLogoDisplay(Screen):
 	def serviceStart(self):
 		global services, dirty
 		dirty = True
+		if not self.session.nav.getCurrentService() or not self.session.nav.getCurrentlyPlayingServiceReference():
+			return
 		name = self.session.nav.getCurrentService().info().getName()
 		ref = self.session.nav.getCurrentlyPlayingServiceReference().toString()
-                # try to get name and ref from recording
+		# try to get name and ref from recording
 		recmeta = self.session.nav.getCurrentlyPlayingServiceReference().getPath() + '.meta'
 		if os.path.isfile(recmeta):
 			with open(recmeta) as f:
@@ -348,8 +357,12 @@ class AntiLogoMenu(Screen):
 		self.steplist = (1, 2, 5, 10, 20, 50, 100, 200)
 		self.stepindex = 2
 		self.activate()
-		ss  ="<screen position=\"center,center\" size=\"80,230\" title=\"AntiLogo\" >"
-		ss +="<widget name=\"menu\" position=\"0,0\" size=\"80,230\" scrollbarMode=\"showOnDemand\" />"
+		if FHD:
+			ss ="<screen position=\"center,center\" size=\"285,450\" title=\"AntiLogo\" >"
+			ss +="<widget name=\"menu\" position=\"23,23\" size=\"240,450\" scrollbarMode=\"showOnDemand\" font=\"Regular;32\" itemHeight=\"41\" />"
+		else:
+			ss ="<screen position=\"center,center\" size=\"190,300\" title=\"AntiLogo\" >"
+			ss +="<widget name=\"menu\" position=\"15,15\" size=\"160,300\" scrollbarMode=\"showOnDemand\" />"
 		ss +="</screen>"
 		self.skin = ss
 
@@ -410,7 +423,12 @@ class AntiLogoMenu(Screen):
 			self.exit()
 		else:
 			self.deActivate()
-			dlgNoBorder = self.session.instantiateDialog(AntiLogoScreen, size = [60, 60], position = [30, 30], color = 4)
+			x = 60
+			y = 30
+			if FHD:
+				x = 90
+				y = 45
+			dlgNoBorder = self.session.instantiateDialog(AntiLogoScreen, size = [x, x], position = [y, y], color = 4)
 			dlgWithBorder = self.session.instantiateDialog(AntiLogoScreen, size = dlgNoBorder.size, position = dlgNoBorder.position, color = dlgNoBorder.color, border = True)
 			self.display.dlgs.append(dlgNoBorder)
 			self.list.append(dlgWithBorder)
@@ -443,11 +461,12 @@ class AntiLogoMenu(Screen):
 	def save(self):
 		global dirty
 		if not dirty:
-			for preset in list(self.display.service):
-				self.display.service.remove(preset)
-			for dlg in self.list:
-				preset = newPreset(x = dlg.position[0], y = dlg.position[1], width = dlg.size[0], height = dlg.size[1], color = dlg.color)
-				self.display.service.append(preset)
+			if self.display.service is not None:
+				for preset in list(self.display.service):
+					self.display.service.remove(preset)
+				for dlg in self.list:
+					preset = newPreset(x = dlg.position[0], y = dlg.position[1], width = dlg.size[0], height = dlg.size[1], color = dlg.color)
+					self.display.service.append(preset)
 
 	def stepUp(self):
 		if self.stepindex < len(self.steplist) - 1:
@@ -495,9 +514,10 @@ def main(session, **kwargs):
 def autostart(reason, session = None, **kwargs):
 	global services, config, configfilename
 	if reason == 1:
-		for service in list(services):
-			if len(list(service)) == 0:
-				services.remove(service)
+		if services is not None:
+			for service in list(services):
+				if len(list(service)) == 0:
+					services.remove(service)
 		write(config, configfilename)
 
 def sessionstart(reason, session = None, **kwargs):
@@ -506,6 +526,6 @@ def sessionstart(reason, session = None, **kwargs):
 		display = session.instantiateDialog(AntiLogoDisplay)
 
 def Plugins(**kwargs):
-	return [PluginDescriptor(name = "AntiLogo", where = PluginDescriptor.WHERE_EXTENSIONSMENU, fnc = main),
+	return [PluginDescriptor(name = _("AntiLogo"), where = PluginDescriptor.WHERE_EXTENSIONSMENU, fnc = main),
 			PluginDescriptor(where = PluginDescriptor.WHERE_AUTOSTART, fnc = autostart ),
 			PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = sessionstart)]
