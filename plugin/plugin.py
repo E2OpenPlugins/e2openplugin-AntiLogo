@@ -260,9 +260,11 @@ class AntiLogoDisplay(Screen):
 	def serviceStart(self):
 		global services, dirty
 		dirty = True
+		if not self.session.nav.getCurrentService() or self.session.nav.getCurrentlyPlayingServiceReference():
+			return
 		name = self.session.nav.getCurrentService().info().getName()
 		ref = self.session.nav.getCurrentlyPlayingServiceReference().toString()
-                # try to get name and ref from recording
+		# try to get name and ref from recording
 		recmeta = self.session.nav.getCurrentlyPlayingServiceReference().getPath() + '.meta'
 		if os.path.isfile(recmeta):
 			with open(recmeta) as f:
