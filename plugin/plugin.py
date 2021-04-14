@@ -99,7 +99,7 @@ class AntiLogoScreen(Screen):
 		else:
 			borderStr = "flags=\"wfNoBorder\""
 		colorStr = "backgroundColor=\"#%s000000\"" % '{0:02X}'.format(self.color << 4)
-		self.skin = "<screen title=\"logo\" position=\"%i,%i\" size=\"%i,%i\" %s %s/>" %(position[0], position[1], size[0], size[1], colorStr, borderStr)
+		self.skin = "<screen title=\"logo\" position=\"%i,%i\" size=\"%i,%i\" %s %s/>" % (position[0], position[1], size[0], size[1], colorStr, borderStr)
 		Screen.__init__(self, session)
 
 	def move(self):
@@ -219,7 +219,7 @@ class AntiLogoDisplay(Screen):
 
 	def __init__(self, session):
 		desktop_size = getDesktop(0).size()
-		AntiLogoDisplay.skin = "<screen name=\"AntiLogoDisplay\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
+		AntiLogoDisplay.skin = "<screen name=\"AntiLogoDisplay\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" % (desktop_size.width(), desktop_size.height())
 		Screen.__init__(self, session)
 		self.session = session
 		self.service = None
@@ -311,7 +311,7 @@ class AntiLogoMain(Screen):
 	def __init__(self, session):
 		global config, services, configfilename, defaultconfig, display, dirty
 		desktop_size = getDesktop(0).size()
-		AntiLogoMain.skin = "<screen name=\"AntiLogoMain\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" %(desktop_size.width(), desktop_size.height())
+		AntiLogoMain.skin = "<screen name=\"AntiLogoMain\" position=\"0,0\" size=\"%d,%d\" flags=\"wfNoBorder\" zPosition=\"-1\" backgroundColor=\"transparent\" />" % (desktop_size.width(), desktop_size.height())
 		Screen.__init__(self, session)
 		self.session = session
 		if display is None:
@@ -343,7 +343,7 @@ class AntiLogoMain(Screen):
 			self.session.deleteDialog(display)
 			del display
 			display = None
-			enabled= False
+			enabled = False
 		setEnabled(services, enabled)
 		self.close()
 
@@ -357,12 +357,12 @@ class AntiLogoMenu(Screen):
 		self.stepindex = 2
 		self.activate()
 		if FHD:
-			ss ="<screen position=\"center,center\" size=\"285,450\" title=\"AntiLogo\" >"
-			ss +="<widget name=\"menu\" position=\"23,23\" size=\"240,450\" scrollbarMode=\"showOnDemand\" font=\"Regular;32\" itemHeight=\"41\" />"
+			ss = "<screen position=\"center,center\" size=\"285,450\" title=\"AntiLogo\" >"
+			ss += "<widget name=\"menu\" position=\"23,23\" size=\"240,450\" scrollbarMode=\"showOnDemand\" font=\"Regular;32\" itemHeight=\"41\" />"
 		else:
-			ss ="<screen position=\"center,center\" size=\"190,300\" title=\"AntiLogo\" >"
-			ss +="<widget name=\"menu\" position=\"15,15\" size=\"160,300\" scrollbarMode=\"showOnDemand\" />"
-		ss +="</screen>"
+			ss = "<screen position=\"center,center\" size=\"190,300\" title=\"AntiLogo\" >"
+			ss += "<widget name=\"menu\" position=\"15,15\" size=\"160,300\" scrollbarMode=\"showOnDemand\" />"
+		ss += "</screen>"
 		self.skin = ss
 
 		self["menu"] = MenuList(
