@@ -223,8 +223,8 @@ class AntiLogoDisplay(Screen):
 		Screen.__init__(self, session)
 		self.session = session
 		self.service = None
-		self.dlgs = [ ]
-		self.infobars = [ ]
+		self.dlgs = []
+		self.infobars = []
 
 		self.__event_tracker = ServiceEventTracker(screen=self, eventmap={
 				iPlayableService.evStart: self.__evServiceStart,
@@ -526,5 +526,5 @@ def sessionstart(reason, session=None, **kwargs):
 
 def Plugins(**kwargs):
 	return [PluginDescriptor(name=_("AntiLogo"), where=PluginDescriptor.WHERE_EXTENSIONSMENU, fnc=main),
-			PluginDescriptor(where=PluginDescriptor.WHERE_AUTOSTART, fnc=autostart ),
+			PluginDescriptor(where=PluginDescriptor.WHERE_AUTOSTART, fnc=autostart),
 			PluginDescriptor(where=PluginDescriptor.WHERE_SESSIONSTART, fnc=sessionstart)]
