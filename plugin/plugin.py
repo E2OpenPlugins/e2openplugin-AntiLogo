@@ -51,7 +51,7 @@ def load(filename, defaultfile):
 	return (xmlobject, root)
 
 def write(xmlobject, filename):
-	xmlobject.write(filename, encoding = "iso-8859-1")
+	xmlobject.write(filename, encoding="iso-8859-1")
 
 def getEnabled(services):
 	return services.get('enabled') == "True"
@@ -88,7 +88,7 @@ def getColor(preset):
 
 # Classes
 class AntiLogoScreen(Screen):
-	def __init__(self, session, size, position, color, border = False):
+	def __init__(self, session, size, position, color, border=False):
 		self.session = session
 		self.size = size
 		self.position = position
@@ -194,8 +194,8 @@ class AntiLogoColor(AntiLogoBase):
 	def go(self):
 		self.session.deleteDialog(self.list0[self.index])
 		self.session.deleteDialog(self.list1[self.index])
-		self.list0[self.index] = self.session.instantiateDialog(AntiLogoScreen, size = self.size, position = self.position, color = self.color)
-		self.list1[self.index] = self.session.instantiateDialog(AntiLogoScreen, size = self.size, position = self.position, color = self.color, border = True)
+		self.list0[self.index] = self.session.instantiateDialog(AntiLogoScreen, size=self.size, position=self.position, color=self.color)
+		self.list1[self.index] = self.session.instantiateDialog(AntiLogoScreen, size=self.size, position=self.position, color=self.color, border=True)
 		self.list1[self.index].show()
 		self.close(-1)
 
@@ -226,8 +226,7 @@ class AntiLogoDisplay(Screen):
 		self.dlgs = [ ]
 		self.infobars = [ ]
 
-		self.__event_tracker = ServiceEventTracker(screen = self, eventmap =
-			{
+		self.__event_tracker = ServiceEventTracker(screen=self, eventmap={
 				iPlayableService.evStart: self.__evServiceStart,
 				iPlayableService.evEnd: self.__evServiceEnd
 			})
@@ -283,7 +282,7 @@ class AntiLogoDisplay(Screen):
 				position = getPosition(preset)
 				size = getSize(preset)
 				color = getColor(preset)
-				dlg = self.session.instantiateDialog(AntiLogoScreen, size = size, position = position, color = color)
+				dlg = self.session.instantiateDialog(AntiLogoScreen, size=size, position=position, color=color)
 				dlg.show()
 				self.dlgs.append(dlg)
 		else:
@@ -323,7 +322,7 @@ class AntiLogoMain(Screen):
 		dirty = False
 		self.dlgs = []
 		for dlg in display.dlgs:
-			dlgWithBorder = session.instantiateDialog(AntiLogoScreen, size = dlg.size, position = dlg.position, color = dlg.color, border = True)
+			dlgWithBorder = session.instantiateDialog(AntiLogoScreen, size=dlg.size, position=dlg.position, color=dlg.color, border=True)
 			self.dlgs.append(dlgWithBorder)
 
 	def close(self):
@@ -428,8 +427,8 @@ class AntiLogoMenu(Screen):
 			if FHD:
 				x = 90
 				y = 45
-			dlgNoBorder = self.session.instantiateDialog(AntiLogoScreen, size = [x, x], position = [y, y], color = 4)
-			dlgWithBorder = self.session.instantiateDialog(AntiLogoScreen, size = dlgNoBorder.size, position = dlgNoBorder.position, color = dlgNoBorder.color, border = True)
+			dlgNoBorder = self.session.instantiateDialog(AntiLogoScreen, size=[x, x], position=[y, y], color=4)
+			dlgWithBorder = self.session.instantiateDialog(AntiLogoScreen, size=dlgNoBorder.size, position=dlgNoBorder.position, color=dlgNoBorder.color, border=True)
 			self.display.dlgs.append(dlgNoBorder)
 			self.list.append(dlgWithBorder)
 			self.index = len(self.list) - 1
@@ -465,7 +464,7 @@ class AntiLogoMenu(Screen):
 				for preset in list(self.display.service):
 					self.display.service.remove(preset)
 				for dlg in self.list:
-					preset = newPreset(x = dlg.position[0], y = dlg.position[1], width = dlg.size[0], height = dlg.size[1], color = dlg.color)
+					preset = newPreset(x=dlg.position[0], y=dlg.position[1], width=dlg.size[0], height=dlg.size[1], color=dlg.color)
 					self.display.service.append(preset)
 
 	def stepUp(self):
@@ -511,7 +510,7 @@ def main(session, **kwargs):
 		dlg = session.open(AntiLogoMain)
 		dlg.openMenu()
 
-def autostart(reason, session = None, **kwargs):
+def autostart(reason, session=None, **kwargs):
 	global services, config, configfilename
 	if reason == 1:
 		if services is not None:
@@ -520,12 +519,12 @@ def autostart(reason, session = None, **kwargs):
 					services.remove(service)
 		write(config, configfilename)
 
-def sessionstart(reason, session = None, **kwargs):
+def sessionstart(reason, session=None, **kwargs):
 	global display
 	if reason == 0 and getEnabled(services):
 		display = session.instantiateDialog(AntiLogoDisplay)
 
 def Plugins(**kwargs):
-	return [PluginDescriptor(name = _("AntiLogo"), where = PluginDescriptor.WHERE_EXTENSIONSMENU, fnc = main),
-			PluginDescriptor(where = PluginDescriptor.WHERE_AUTOSTART, fnc = autostart ),
-			PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = sessionstart)]
+	return [PluginDescriptor(name=_("AntiLogo"), where=PluginDescriptor.WHERE_EXTENSIONSMENU, fnc=main),
+			PluginDescriptor(where=PluginDescriptor.WHERE_AUTOSTART, fnc=autostart ),
+			PluginDescriptor(where=PluginDescriptor.WHERE_SESSIONSTART, fnc=sessionstart)]
