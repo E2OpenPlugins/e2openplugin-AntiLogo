@@ -33,6 +33,8 @@ if getDesktop(0).size().width() >= 1920:
 	FHD = True
 
 #Global functions
+
+
 def load(filename, defaultfile):
 	doublefault = False
 	xmlobject = None
@@ -50,14 +52,18 @@ def load(filename, defaultfile):
 			doublefault = True
 	return (xmlobject, root)
 
+
 def write(xmlobject, filename):
 	xmlobject.write(filename, encoding="iso-8859-1")
+
 
 def getEnabled(services):
 	return services.get('enabled') == "True"
 
+
 def setEnabled(services, value):
 	services.set('enabled', str(value))
+
 
 def getService(services, ref):
 	for service in services:
@@ -65,28 +71,36 @@ def getService(services, ref):
 			return service
 	return None
 
+
 def createService(services, ref, name):
 	newService = xml.Element("service", {'name': name, 'ref': ref})
 	if newService not in services:
 		services.append(newService)
 	return newService
 
+
 def newPreset(x, y, width, height, color):
 	return xml.Element("preset", {'x': '%i' % x, 'y': '%i' % y, 'width': '%i' % width, 'height': '%i' % height, 'color': '%i' % color})
+
 
 def getPosition(preset):
 	return [int(preset.get("x")), int(preset.get("y"))]
 
+
 def getSize(preset):
 	return [int(preset.get("width")), int(preset.get("height"))]
 
+
 def getColor(preset):
 	return int(preset.get("color"))
+
 
 # Initialisation
 (config, services) = load(configfilename, defaultconfig)
 
 # Classes
+
+
 class AntiLogoScreen(Screen):
 	def __init__(self, session, size, position, color, border=False):
 		self.session = session
@@ -108,6 +122,7 @@ class AntiLogoScreen(Screen):
 	def resize(self):
 		self.instance.resize(eSize(*(self.size[0], self.size[1])))
 
+
 class AntiLogoBase(AntiLogoScreen):
 	def __init__(self, session, screen):
 		AntiLogoScreen.__init__(self, session, screen.size, screen.position, screen.color, screen.border)
@@ -121,6 +136,7 @@ class AntiLogoBase(AntiLogoScreen):
 			"left": self.left,
 			"right": self.right,
 			}, -1)
+
 
 class AntiLogoMove(AntiLogoBase):
 	def __init__(self, session, screen0, screen1, step):
@@ -152,6 +168,7 @@ class AntiLogoMove(AntiLogoBase):
 		self.position[0] += self.step
 		self.move()
 
+
 class AntiLogoResize(AntiLogoBase):
 	def __init__(self, session, screen0, screen1, step):
 		self.screen0 = screen0
@@ -181,6 +198,7 @@ class AntiLogoResize(AntiLogoBase):
 	def right(self):
 		self.size[0] += self.step
 		self.resize()
+
 
 class AntiLogoColor(AntiLogoBase):
 	def __init__(self, session, list0, list1, index):
@@ -214,6 +232,7 @@ class AntiLogoColor(AntiLogoBase):
 
 	def right(self):
 		pass
+
 
 class AntiLogoDisplay(Screen):
 
@@ -307,6 +326,7 @@ class AntiLogoDisplay(Screen):
 		for dlg in self.dlgs:
 			dlg.hide()
 
+
 class AntiLogoMain(Screen):
 	def __init__(self, session):
 		global config, services, configfilename, defaultconfig, display, dirty
@@ -346,6 +366,7 @@ class AntiLogoMain(Screen):
 			enabled = False
 		setEnabled(services, enabled)
 		self.close()
+
 
 class AntiLogoMenu(Screen):
 	def __init__(self, session, display, list):
@@ -505,10 +526,12 @@ class AntiLogoMenu(Screen):
 			self.list[self.index].color = newColor
 			self.color()
 
+
 def main(session, **kwargs):
 	if session.nav.getCurrentService():
 		dlg = session.open(AntiLogoMain)
 		dlg.openMenu()
+
 
 def autostart(reason, session=None, **kwargs):
 	global services, config, configfilename
@@ -519,10 +542,12 @@ def autostart(reason, session=None, **kwargs):
 					services.remove(service)
 		write(config, configfilename)
 
+
 def sessionstart(reason, session=None, **kwargs):
 	global display
 	if reason == 0 and getEnabled(services):
 		display = session.instantiateDialog(AntiLogoDisplay)
+
 
 def Plugins(**kwargs):
 	return [PluginDescriptor(name=_("AntiLogo"), where=PluginDescriptor.WHERE_EXTENSIONSMENU, fnc=main),
