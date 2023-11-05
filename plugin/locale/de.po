@@ -1,0 +1,46 @@
+
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-04-15 10:33+0000\n"
+"PO-Revision-Date: 2023-04-15 11:33+0000\n"
+"Last-Translator: Me <me@gmx.de>\n"
+"Language-Team: German <me@gmx.de>\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Poedit-Basepath: .\n"
+"X-Poedit-SearchPath-0: ..\n"
+
+msgid "AntiLogo"
+msgstr ""
+
+msgid "add"
+msgstr "Hinzufügen"
+
+msgid "move"
+msgstr "Verschieben"
+
+msgid "resize"
+msgstr "Größe ändern"
+
+msgid "alpha"
+msgstr "Transparenz"
+
+msgid "step +"
+msgstr "Ändern +"
+
+msgid "step -"
+msgstr "Ändern -"
+
+msgid "remove"
+msgstr "Entfernen"
+
+msgid "next"
+msgstr "Nächstes"
+
+msgid "stop"
+msgstr "Stop"
